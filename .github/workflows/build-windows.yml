@@ -1,0 +1,103 @@
+name: Build Windows Executable
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Download FFmpeg
+      run: |
+        # Download FFmpeg for Windows
+        Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile "ffmpeg.zip"
+        Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg-temp"
+        # Find and copy ffmpeg.exe
+        $ffmpegPath = Get-ChildItem -Path "ffmpeg-temp" -Filter "ffmpeg.exe" -Recurse | Select-Object -First 1
+        Copy-Item -Path $ffmpegPath.FullName -Destination "ffmpeg.exe"
+        # Verify ffmpeg.exe exists
+        if (Test-Path "ffmpeg.exe") {
+          Write-Host "✅ FFmpeg downloaded successfully"
+          $size = (Get-Item "ffmpeg.exe").Length / 1MB
+          Write-Host "📏 FFmpeg size: $([math]::Round($size, 1)) MB"
+        } else {
+          Write-Host "❌ FFmpeg download failed"
+          exit 1
+        }
+        
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Verify dependencies
+      run: |
+        python -c "import customtkinter; print('✅ CustomTkinter:', customtkinter.__version__)"
+        python -c "import openai; print('✅ OpenAI:', openai.__version__)"
+        python -c "import pydub; print('✅ Pydub imported successfully')"
+        
+    - name: Build executable with PyInstaller
+      run: |
+        pyinstaller AudioTranscriber.spec
+        
+    - name: Verify build
+      run: |
+        if (Test-Path "dist/AudioTranscriber.exe") {
+          $size = (Get-Item "dist/AudioTranscriber.exe").Length / 1MB
+          Write-Host "✅ Build successful!"
+          Write-Host "📁 Executable: dist/AudioTranscriber.exe"
+          Write-Host "📏 File size: $([math]::Round($size, 1)) MB"
+        } else {
+          Write-Host "❌ Build failed - executable not found"
+          exit 1
+        }
+        
+    - name: Upload executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: AudioTranscriber-Windows
+        path: dist/AudioTranscriber.exe
+        retention-days: 30
+        
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/AudioTranscriber.exe
+        name: Audio Transcriber ${{ github.ref_name }}
+        body: |
+          ## Audio Transcriber ${{ github.ref_name }}
+          
+          Windows executable for the Audio Transcriber application.
+          
+          ### Features:
+          - OpenAI API key input and saving
+          - Automatic audio compression and splitting for large files
+          - Support for files over 25MB and 23 minutes
+          - Custom filename and output directory
+          - Copy transcription to clipboard
+          
+          ### Requirements:
+          - Windows 10 or later
+          - OpenAI API key
+          
+          ### Usage:
+          1. Download AudioTranscriber.exe
+          2. Run the application
+          3. Enter your OpenAI API key
+          4. Select audio file and transcribe!
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
