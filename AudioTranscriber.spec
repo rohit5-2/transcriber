@@ -1,24 +1,20 @@
+openai>=1.0.0
+customtkinter>=5.0.0
+pydub>=0.25.0
 # -*- mode: python ; coding: utf-8 -*-
-import sys
 
 block_cipher = None
-
-# OS-specific binary inclusion
-if sys.platform == "win32":
-    ffmpeg_binary = ('ffmpeg.exe', '.')
-elif sys.platform == "darwin":  # macOS
-    ffmpeg_binary = ('ffmpeg.exe', '.')  # Still Windows ffmpeg for cross-compile
-else:  # Linux
-    ffmpeg_binary = ('ffmpeg.exe', '.')
 
 a = Analysis(
     ['audio_transcriber.py'],
     pathex=[],
-    binaries=[ffmpeg_binary],
+    binaries=[
+        ('ffmpeg.exe', '.'),
+    ],
     datas=[],
     hiddenimports=[
-        'customtkinter', 
-        'PIL', 
+        'customtkinter',
+        'PIL',
         'PIL._tkinter_finder',
         'pydub',
         'pydub.utils',
