@@ -73,3 +73,33 @@ jobs:
         name: AudioTranscriber-Windows
         path: dist/AudioTranscriber.exe
         retention-days: 30
+
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/AudioTranscriber.exe
+        name: Audio Transcriber ${{ github.ref_name }}
+        body: |
+          ## Audio Transcriber ${{ github.ref_name }}
+          
+          Windows executable for the Audio Transcriber application.
+          
+          ### Features:
+          - OpenAI API key input and saving
+          - Automatic audio compression and splitting for large files
+          - Support for files over 25MB and 23 minutes
+          - Custom filename and output directory
+          - Copy transcription to clipboard
+          
+          ### Requirements:
+          - Windows 10 or later
+          - OpenAI API key
+          
+          ### Usage:
+          1. Download AudioTranscriber.exe
+          2. Run the application
+          3. Enter your OpenAI API key (saved automatically)
+          4. Select audio file and transcribe!
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

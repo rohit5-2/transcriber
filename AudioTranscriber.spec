@@ -1,6 +1,3 @@
-openai>=1.0.0
-customtkinter>=5.0.0
-pydub>=0.25.0
 # -*- mode: python ; coding: utf-8 -*-
 
 block_cipher = None
