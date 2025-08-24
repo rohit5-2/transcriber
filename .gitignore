@@ -1,1 +1,19 @@
+# FFmpeg (downloaded during build)
 ffmpeg.exe
+
+# Build artifacts
+dist/
+build/
+*.spec
+
+# Config files (contains API keys)
+transcriber_config.json
+
+# Logs
+transcription_log.txt
+*.log
+
+# Temporary files
+__pycache__/
+*.pyc
+*.pyo
