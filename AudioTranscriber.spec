@@ -6,8 +6,7 @@ a = Analysis(
     ['audio_transcriber.py'],
     pathex=[],
     binaries=[
-        ('ffmpeg.exe', '.'),
-        ('ffprobe.exe', '.'),
+        ('ffmpeg', 'ffmpeg'),  # Include entire ffmpeg folder with all DLLs
     ],
     datas=[],
     hiddenimports=[

@@ -25,29 +25,28 @@ jobs:
         $env:PYTHONUTF8 = "1"
         echo "PYTHONUTF8=1" >> $env:GITHUB_ENV
         
-    - name: Download FFmpeg
+    - name: Download Complete FFmpeg Package
       run: |
-        Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile "ffmpeg.zip"
-        Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg-temp"
+        # Download the working essentials build (smaller but has all you need)
+        Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.7z" -OutFile "ffmpeg.7z"
         
-        # Find and copy both ffmpeg.exe and ffprobe.exe
-        $ffmpegPath = Get-ChildItem -Path "ffmpeg-temp" -Filter "ffmpeg.exe" -Recurse | Select-Object -First 1
-        $ffprobePath = Get-ChildItem -Path "ffmpeg-temp" -Filter "ffprobe.exe" -Recurse | Select-Object -First 1
+        # Extract using built-in Windows tools
+        Expand-Archive -Path "ffmpeg.7z" -DestinationPath "ffmpeg-temp" -Force
         
-        Copy-Item -Path $ffmpegPath.FullName -Destination "ffmpeg.exe"
-        Copy-Item -Path $ffprobePath.FullName -Destination "ffprobe.exe"
+        # Create proper folder structure
+        New-Item -ItemType Directory -Force -Path "ffmpeg\bin"
         
-        # Verify both files exist
-        if ((Test-Path "ffmpeg.exe") -and (Test-Path "ffprobe.exe")) {
-          $ffmpegSize = (Get-Item "ffmpeg.exe").Length / 1MB
-          $ffprobeSize = (Get-Item "ffprobe.exe").Length / 1MB
-          Write-Host "[SUCCESS] Both executables downloaded"
-          Write-Host "[INFO] FFmpeg size: $([math]::Round($ffmpegSize, 1)) MB"
-          Write-Host "[INFO] FFprobe size: $([math]::Round($ffprobeSize, 1)) MB"
-        } else {
-          Write-Host "[ERROR] Missing executables"
-          exit 1
-        }
+        # Find the bin directory and copy all files
+        $binDir = Get-ChildItem -Path "ffmpeg-temp" -Recurse -Directory -Name "bin" | Select-Object -First 1
+        $sourcePath = Join-Path "ffmpeg-temp" $binDir
+        Copy-Item -Path "$sourcePath\*" -Destination "ffmpeg\bin\" -Force
+        
+        # Verify files copied
+        $files = Get-ChildItem -Path "ffmpeg\bin\" -Name "*.exe"
+        Write-Host "[SUCCESS] Found executables: $($files -join ', ')"
+        
+        # List all files in bin directory
+        Get-ChildItem -Path "ffmpeg\bin\" | Format-Table Name, Length
         
     - name: Install Python dependencies
       run: |

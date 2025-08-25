@@ -24,23 +24,18 @@ logging.basicConfig(
     ]
 )
 
-# FFmpeg path handling for both development and packaged versions
 def get_ffmpeg_path():
     """Get the correct ffmpeg path for both development and packaged executable"""
     if getattr(sys, 'frozen', False):
-        # Running as packaged executable
-        if hasattr(sys, '_MEIPASS'):
-            # PyInstaller temp directory
-            path = os.path.join(sys._MEIPASS, 'ffmpeg.exe')
-        else:
-            # Fallback for other packagers
-            path = os.path.join(os.path.dirname(sys.executable), 'ffmpeg.exe')
+        # Running as packaged executable - use _MEIPASS
+        base_path = sys._MEIPASS
+        ffmpeg_path = os.path.join(base_path, 'ffmpeg', 'bin', 'ffmpeg.exe')
     else:
         # Running as Python script in development
-        path = os.path.join(os.path.dirname(__file__), 'ffmpeg.exe')
+        base_path = os.path.dirname(__file__)
+        ffmpeg_path = os.path.join(base_path, 'ffmpeg', 'bin', 'ffmpeg.exe')
     
-    # Convert to absolute path
-    abs_path = os.path.abspath(path)
+    abs_path = os.path.abspath(ffmpeg_path)
     logging.info(f"FFmpeg path resolved to: {abs_path}")
     logging.info(f"FFmpeg exists: {os.path.exists(abs_path)}")
     return abs_path
@@ -48,19 +43,15 @@ def get_ffmpeg_path():
 def get_ffprobe_path():
     """Get the correct ffprobe path for both development and packaged executable"""
     if getattr(sys, 'frozen', False):
-        # Running as packaged executable
-        if hasattr(sys, '_MEIPASS'):
-            # PyInstaller temp directory
-            path = os.path.join(sys._MEIPASS, 'ffprobe.exe')
-        else:
-            # Fallback for other packagers
-            path = os.path.join(os.path.dirname(sys.executable), 'ffprobe.exe')
+        # Running as packaged executable - use _MEIPASS  
+        base_path = sys._MEIPASS
+        ffprobe_path = os.path.join(base_path, 'ffmpeg', 'bin', 'ffprobe.exe')
     else:
         # Running as Python script in development
-        path = os.path.join(os.path.dirname(__file__), 'ffprobe.exe')
+        base_path = os.path.dirname(__file__)
+        ffprobe_path = os.path.join(base_path, 'ffmpeg', 'bin', 'ffprobe.exe')
     
-    # Convert to absolute path
-    abs_path = os.path.abspath(path)
+    abs_path = os.path.abspath(ffprobe_path)
     logging.info(f"FFprobe path resolved to: {abs_path}")
     logging.info(f"FFprobe exists: {os.path.exists(abs_path)}")
     return abs_path
@@ -73,6 +64,7 @@ FFPROBE_PATH = get_ffprobe_path()
 AudioSegment.converter = FFMPEG_PATH
 AudioSegment.ffmpeg = FFMPEG_PATH
 AudioSegment.ffprobe = FFPROBE_PATH
+
 
 # Log critical startup information
 logging.info(f"Application starting...")
