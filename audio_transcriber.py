@@ -31,13 +31,19 @@ def get_ffmpeg_path():
         # Running as packaged executable
         if hasattr(sys, '_MEIPASS'):
             # PyInstaller temp directory
-            return os.path.join(sys._MEIPASS, 'ffmpeg.exe')
+            path = os.path.join(sys._MEIPASS, 'ffmpeg.exe')
         else:
             # Fallback for other packagers
-            return os.path.join(os.path.dirname(sys.executable), 'ffmpeg.exe')
+            path = os.path.join(os.path.dirname(sys.executable), 'ffmpeg.exe')
     else:
         # Running as Python script in development
-        return os.path.join(os.path.dirname(__file__), 'ffmpeg.exe')
+        path = os.path.join(os.path.dirname(__file__), 'ffmpeg.exe')
+    
+    # Convert to absolute path
+    abs_path = os.path.abspath(path)
+    logging.info(f"FFmpeg path resolved to: {abs_path}")
+    logging.info(f"FFmpeg exists: {os.path.exists(abs_path)}")
+    return abs_path
 
 def get_ffprobe_path():
     """Get the correct ffprobe path for both development and packaged executable"""
@@ -45,13 +51,19 @@ def get_ffprobe_path():
         # Running as packaged executable
         if hasattr(sys, '_MEIPASS'):
             # PyInstaller temp directory
-            return os.path.join(sys._MEIPASS, 'ffprobe.exe')
+            path = os.path.join(sys._MEIPASS, 'ffprobe.exe')
         else:
             # Fallback for other packagers
-            return os.path.join(os.path.dirname(sys.executable), 'ffprobe.exe')
+            path = os.path.join(os.path.dirname(sys.executable), 'ffprobe.exe')
     else:
         # Running as Python script in development
-        return os.path.join(os.path.dirname(__file__), 'ffprobe.exe')
+        path = os.path.join(os.path.dirname(__file__), 'ffprobe.exe')
+    
+    # Convert to absolute path
+    abs_path = os.path.abspath(path)
+    logging.info(f"FFprobe path resolved to: {abs_path}")
+    logging.info(f"FFprobe exists: {os.path.exists(abs_path)}")
+    return abs_path
 
 # Set the FFmpeg paths globally
 FFMPEG_PATH = get_ffmpeg_path()
@@ -61,6 +73,14 @@ FFPROBE_PATH = get_ffprobe_path()
 AudioSegment.converter = FFMPEG_PATH
 AudioSegment.ffmpeg = FFMPEG_PATH
 AudioSegment.ffprobe = FFPROBE_PATH
+
+# Log critical startup information
+logging.info(f"Application starting...")
+logging.info(f"Python executable: {sys.executable}")
+logging.info(f"Current working directory: {os.getcwd()}")
+logging.info(f"App is frozen: {getattr(sys, 'frozen', False)}")
+if hasattr(sys, '_MEIPASS'):
+    logging.info(f"PyInstaller temp dir: {sys._MEIPASS}")
 
 class AudioTranscriberApp:
     def __init__(self):
@@ -75,7 +95,7 @@ class AudioTranscriberApp:
             # Initialize main window with larger size
             self.window = ctk.CTk()
             self.window.title("Audio Transcriber")
-            self.window.geometry("650x800")  # Made taller for API key field
+            self.window.geometry("650x800")
             self.window.resizable(True, True)
             
             # OpenAI limits
@@ -153,37 +173,62 @@ class AudioTranscriberApp:
     def get_audio_duration(self, file_path):
         """Get audio duration in seconds using pydub"""
         try:
-            # Ensure both ffmpeg and ffprobe are set
+            # Convert to absolute path
+            abs_file_path = os.path.abspath(file_path)
+            
+            logging.info(f"Getting duration for file: {abs_file_path}")
+            logging.info(f"File exists: {os.path.exists(abs_file_path)}")
+            logging.info(f"File size: {os.path.getsize(abs_file_path) if os.path.exists(abs_file_path) else 'N/A'}")
+            
+            # Verify file exists
+            if not os.path.exists(abs_file_path):
+                return None, f"Audio file does not exist: {abs_file_path}"
+            
+            # Ensure both ffmpeg and ffprobe are set with absolute paths
             AudioSegment.converter = FFMPEG_PATH
             AudioSegment.ffmpeg = FFMPEG_PATH  
             AudioSegment.ffprobe = FFPROBE_PATH
             
-            # Log paths for debugging
-            logging.info(f"FFmpeg path: {FFMPEG_PATH}")
-            logging.info(f"FFprobe path: {FFPROBE_PATH}")
-            logging.info(f"FFmpeg exists: {os.path.exists(FFMPEG_PATH)}")
-            logging.info(f"FFprobe exists: {os.path.exists(FFPROBE_PATH)}")
+            # Log FFmpeg paths and existence
+            logging.info(f"Using FFmpeg: {FFMPEG_PATH} (exists: {os.path.exists(FFMPEG_PATH)})")
+            logging.info(f"Using FFprobe: {FFPROBE_PATH} (exists: {os.path.exists(FFPROBE_PATH)})")
             
-            audio = AudioSegment.from_file(file_path)
-            duration_seconds = len(audio) / 1000.0  # Convert milliseconds to seconds
+            # Check if FFmpeg executables exist
+            if not os.path.exists(FFMPEG_PATH):
+                return None, f"FFmpeg not found at: {FFMPEG_PATH}"
+            if not os.path.exists(FFPROBE_PATH):
+                return None, f"FFprobe not found at: {FFPROBE_PATH}"
+            
+            # Load audio and get duration
+            audio = AudioSegment.from_file(abs_file_path)
+            duration_seconds = len(audio) / 1000.0
+            
+            logging.info(f"Audio duration determined: {duration_seconds:.2f} seconds")
             return duration_seconds, None
             
         except Exception as e:
             error_msg = f"Failed to get audio duration: {str(e)}"
             logging.error(error_msg)
-            # Fallback: Skip duration checking for this file
+            logging.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logging.error(f"Full traceback: {traceback.format_exc()}")
             return None, error_msg
     
     def needs_splitting(self, file_path):
         """Check if file needs splitting based on size and duration"""
         try:
+            # Convert to absolute path
+            abs_file_path = os.path.abspath(file_path)
+            
             # Check file size
-            file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+            file_size_mb = os.path.getsize(abs_file_path) / (1024 * 1024)
             
             # Check duration
-            duration, error = self.get_audio_duration(file_path)
+            duration, error = self.get_audio_duration(abs_file_path)
             if error:
-                return False, file_size_mb, None, error
+                logging.warning(f"Duration check failed, proceeding with size-only check: {error}")
+                # If duration fails, just use size-based splitting
+                return file_size_mb > self.max_file_size_mb, file_size_mb, None, None
             
             needs_split = file_size_mb > self.max_file_size_mb or duration > self.max_duration_seconds
             
@@ -201,8 +246,11 @@ class AudioTranscriberApp:
     def load_config(self):
         """Load configuration from file or set defaults"""
         try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r', encoding='utf-8') as f:
+            # Use absolute path for config file
+            config_path = os.path.abspath(self.config_file)
+            
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
                     
                     # Load API key
@@ -214,19 +262,21 @@ class AudioTranscriberApp:
                     # Load output directory
                     saved_output_dir = config.get('output_directory', '')
                     if saved_output_dir and os.path.exists(saved_output_dir):
-                        self.output_directory.set(saved_output_dir)
+                        self.output_directory.set(os.path.abspath(saved_output_dir))
                         logging.info(f"Loaded saved output directory: {saved_output_dir}")
                         return
             
             # Fallback to desktop if no saved config or directory doesn't exist
             desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-            self.output_directory.set(desktop_path)
-            logging.info(f"Using default output directory: {desktop_path}")
+            desktop_abs_path = os.path.abspath(desktop_path)
+            self.output_directory.set(desktop_abs_path)
+            logging.info(f"Using default output directory: {desktop_abs_path}")
             
         except Exception as e:
             # If there's any error loading config, use defaults
             desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-            self.output_directory.set(desktop_path)
+            desktop_abs_path = os.path.abspath(desktop_path)
+            self.output_directory.set(desktop_abs_path)
             logging.warning(f"Error loading config, using defaults: {e}")
     
     def save_config(self):
@@ -236,7 +286,8 @@ class AudioTranscriberApp:
                 'api_key': self.api_key.get(),
                 'output_directory': self.output_directory.get()
             }
-            with open(self.config_file, 'w', encoding='utf-8') as f:
+            config_path = os.path.abspath(self.config_file)
+            with open(config_path, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=2)
             logging.info("Configuration saved")
         except Exception as e:
@@ -245,14 +296,26 @@ class AudioTranscriberApp:
     def compress_audio(self, input_path, output_path):
         """Compress audio to MP3 64kbps mono using bundled ffmpeg"""
         try:
+            # Convert paths to absolute
+            abs_input = os.path.abspath(input_path)
+            abs_output = os.path.abspath(output_path)
+            
+            logging.info(f"Compressing: {abs_input} -> {abs_output}")
+            
+            # Verify input file exists
+            if not os.path.exists(abs_input):
+                return False, f"Input file does not exist: {abs_input}"
+            
             cmd = [
                 FFMPEG_PATH,  # Use bundled ffmpeg
-                "-i", input_path,
+                "-i", abs_input,
                 "-ac", "1",  # Mono
                 "-b:a", "64k",  # 64kbps bitrate
                 "-y",  # Overwrite output file
-                output_path
+                abs_output
             ]
+            
+            logging.info(f"Running FFmpeg command: {' '.join(cmd)}")
             
             result = subprocess.run(cmd, capture_output=True, text=True, 
                                   creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
@@ -261,14 +324,20 @@ class AudioTranscriberApp:
                 logging.error(f"ffmpeg compression failed: {result.stderr}")
                 return False, f"Compression failed: {result.stderr}"
             
-            compressed_size = os.path.getsize(output_path) / (1024 * 1024)
+            # Verify output file was created
+            if not os.path.exists(abs_output):
+                return False, f"Output file was not created: {abs_output}"
+            
+            compressed_size = os.path.getsize(abs_output) / (1024 * 1024)
             
             # Also check duration after compression
-            duration, duration_error = self.get_audio_duration(output_path)
+            duration, duration_error = self.get_audio_duration(abs_output)
             if duration_error:
-                return False, f"Could not verify compressed file duration: {duration_error}"
+                logging.warning(f"Could not verify compressed file duration: {duration_error}")
+                # Continue without duration check
+                duration = 0
             
-            if compressed_size > self.max_file_size_mb or duration > self.max_duration_seconds:
+            if compressed_size > self.max_file_size_mb or (duration and duration > self.max_duration_seconds):
                 return False, f"Compressed file still exceeds limits: {compressed_size:.1f}MB, {duration:.1f}s"
             
             logging.info(f"Audio compressed successfully: {compressed_size:.1f} MB, {duration:.1f} seconds")
@@ -277,13 +346,19 @@ class AudioTranscriberApp:
         except FileNotFoundError:
             return False, "FFmpeg not found. Please contact support."
         except Exception as e:
+            logging.error(f"Compression error: {str(e)}")
             return False, f"Compression error: {str(e)}"
     
     def split_audio_file(self, input_path, max_size_mb=24, max_duration_seconds=1350):
         """Split audio file into chunks using pydub, respecting both size and duration limits"""
         try:
+            # Convert to absolute path
+            abs_input_path = os.path.abspath(input_path)
+            
+            logging.info(f"Splitting audio file: {abs_input_path}")
+            
             # Load the audio file
-            audio = AudioSegment.from_file(input_path)
+            audio = AudioSegment.from_file(abs_input_path)
             total_duration_ms = len(audio)
             total_duration_seconds = total_duration_ms / 1000.0
             
@@ -295,9 +370,10 @@ class AudioTranscriberApp:
             num_chunks = math.ceil(total_duration_ms / max_chunk_duration_ms)
             
             chunks = []
-            temp_dir = tempfile.gettempdir()
+            temp_dir = os.path.abspath(tempfile.gettempdir())
             
-            logging.info(f"Splitting {total_duration_seconds:.1f}s audio into {num_chunks} chunks of max {max_chunk_duration_ms/1000:.1f}s each")
+            logging.info(f"Splitting {total_duration_seconds:.1f}s audio into {num_chunks} chunks")
+            logging.info(f"Using temp directory: {temp_dir}")
             
             for i in range(num_chunks):
                 start_ms = i * max_chunk_duration_ms
@@ -310,35 +386,42 @@ class AudioTranscriberApp:
                 # Create temporary file for chunk
                 chunk_filename = f"audio_chunk_{int(time.time())}_{i+1}.mp3"
                 chunk_path = os.path.join(temp_dir, chunk_filename)
+                chunk_abs_path = os.path.abspath(chunk_path)
+                
+                logging.info(f"Creating chunk {i+1}: {chunk_abs_path}")
                 
                 # Export chunk as compressed MP3
                 chunk.export(
-                    chunk_path,
+                    chunk_abs_path,
                     format="mp3",
                     bitrate="64k",
                     parameters=["-ac", "1"]  # Force mono
                 )
                 
+                # Verify chunk was created
+                if not os.path.exists(chunk_abs_path):
+                    return None, f"Failed to create chunk {i+1} at {chunk_abs_path}"
+                
                 # Verify chunk meets both size and duration limits
-                chunk_size_mb = os.path.getsize(chunk_path) / (1024 * 1024)
+                chunk_size_mb = os.path.getsize(chunk_abs_path) / (1024 * 1024)
                 
                 if chunk_size_mb > self.max_file_size_mb or chunk_duration_seconds > self.max_duration_seconds:
                     # If still too large, try with lower bitrate
-                    os.remove(chunk_path)
+                    os.remove(chunk_abs_path)
                     chunk.export(
-                        chunk_path,
+                        chunk_abs_path,
                         format="mp3",
                         bitrate="32k",
                         parameters=["-ac", "1"]
                     )
-                    chunk_size_mb = os.path.getsize(chunk_path) / (1024 * 1024)
+                    chunk_size_mb = os.path.getsize(chunk_abs_path) / (1024 * 1024)
                     
                     # Final check
                     if chunk_size_mb > self.max_file_size_mb or chunk_duration_seconds > self.max_duration_seconds:
                         return None, f"Unable to create valid chunks. Chunk {i+1} is still {chunk_size_mb:.1f}MB, {chunk_duration_seconds:.1f}s"
                 
-                chunks.append(chunk_path)
-                self.temp_files.append(chunk_path)
+                chunks.append(chunk_abs_path)
+                self.temp_files.append(chunk_abs_path)
                 
                 logging.info(f"Created chunk {i+1}/{num_chunks}: {chunk_size_mb:.1f} MB, {chunk_duration_seconds:.1f}s")
             
@@ -347,6 +430,8 @@ class AudioTranscriberApp:
         except Exception as e:
             error_msg = f"Failed to split audio: {str(e)}"
             logging.error(error_msg)
+            import traceback
+            logging.error(f"Full traceback: {traceback.format_exc()}")
             return None, error_msg
     
     def setup_ui(self):
@@ -591,7 +676,10 @@ class AudioTranscriberApp:
             )
             
             if filename:
-                file_extension = Path(filename).suffix.lower().lstrip('.')
+                # Convert to absolute path
+                abs_filename = os.path.abspath(filename)
+                
+                file_extension = Path(abs_filename).suffix.lower().lstrip('.')
                 if file_extension not in self.supported_formats:
                     response = messagebox.askyesno(
                         "Unsupported Format",
@@ -603,8 +691,8 @@ class AudioTranscriberApp:
                         return
                 
                 # Check both file size and duration
-                file_size_mb = os.path.getsize(filename) / (1024 * 1024)
-                duration, duration_error = self.get_audio_duration(filename)
+                file_size_mb = os.path.getsize(abs_filename) / (1024 * 1024)
+                duration, duration_error = self.get_audio_duration(abs_filename)
                 
                 if duration_error:
                     messagebox.showwarning("Duration Check Failed", f"Could not determine audio duration:\n{duration_error}")
@@ -626,10 +714,10 @@ class AudioTranscriberApp:
                         f"The original file will not be modified."
                     )
                 
-                self.audio_file_path.set(filename)
-                status_text = f"File selected: {Path(filename).name} ({file_size_mb:.1f} MB, {duration_text})"
+                self.audio_file_path.set(abs_filename)
+                status_text = f"File selected: {Path(abs_filename).name} ({file_size_mb:.1f} MB, {duration_text})"
                 self.status_label.configure(text=status_text)
-                logging.info(f"Audio file selected: {Path(filename).name} ({file_size_mb:.1f} MB, {duration_text})")
+                logging.info(f"Audio file selected: {abs_filename} ({file_size_mb:.1f} MB, {duration_text})")
                 
         except Exception as e:
             logging.error(f"Error browsing audio file: {e}")
@@ -643,9 +731,10 @@ class AudioTranscriberApp:
             )
             
             if directory:
-                self.output_directory.set(directory)
+                abs_directory = os.path.abspath(directory)
+                self.output_directory.set(abs_directory)
                 self.save_config()
-                logging.info(f"Output directory selected and saved: {directory}")
+                logging.info(f"Output directory selected and saved: {abs_directory}")
                 
         except Exception as e:
             logging.error(f"Error browsing output directory: {e}")
@@ -690,8 +779,9 @@ class AudioTranscriberApp:
             messagebox.showerror("Error", "Please select an audio file.")
             return False
         
-        if not os.path.exists(self.audio_file_path.get()):
-            messagebox.showerror("Error", "The selected audio file does not exist.")
+        abs_audio_path = os.path.abspath(self.audio_file_path.get())
+        if not os.path.exists(abs_audio_path):
+            messagebox.showerror("Error", f"The selected audio file does not exist: {abs_audio_path}")
             return False
         
         output_dir = self.output_directory.get()
@@ -699,10 +789,11 @@ class AudioTranscriberApp:
             messagebox.showerror("Error", "Please specify an output directory.")
             return False
         
-        if not os.path.exists(output_dir):
+        abs_output_dir = os.path.abspath(output_dir)
+        if not os.path.exists(abs_output_dir):
             try:
-                os.makedirs(output_dir)
-                logging.info(f"Created output directory: {output_dir}")
+                os.makedirs(abs_output_dir)
+                logging.info(f"Created output directory: {abs_output_dir}")
             except Exception as e:
                 messagebox.showerror("Error", f"Cannot create output directory: {e}")
                 return False
@@ -739,14 +830,17 @@ class AudioTranscriberApp:
             self.update_status("Analyzing audio file...")
             self.update_progress(0.05)
             
-            original_audio_path = self.audio_file_path.get()
-            output_dir = self.output_directory.get()
+            original_audio_path = os.path.abspath(self.audio_file_path.get())
+            output_dir = os.path.abspath(self.output_directory.get())
             output_filename = self.output_filename.get()
             
             if not output_filename.lower().endswith('.txt'):
                 output_filename += '.txt'
             
             output_path = os.path.join(output_dir, output_filename)
+            
+            logging.info(f"Starting transcription for: {original_audio_path}")
+            logging.info(f"Output will be saved to: {output_path}")
             
             # Check if file needs processing (size or duration)
             needs_split, file_size_mb, duration, error = self.needs_splitting(original_audio_path)
@@ -763,7 +857,7 @@ class AudioTranscriberApp:
                 self.update_progress(0.1)
                 
                 # Try compression first
-                temp_dir = tempfile.gettempdir()
+                temp_dir = os.path.abspath(tempfile.gettempdir())
                 temp_compressed = os.path.join(temp_dir, f"compressed_audio_{int(time.time())}.mp3")
                 self.temp_files.append(temp_compressed)
                 
@@ -774,11 +868,11 @@ class AudioTranscriberApp:
                     compressed_size = compressed_info["size"]
                     compressed_duration = compressed_info["duration"]
                     
-                    if compressed_size <= self.max_file_size_mb and compressed_duration <= self.max_duration_seconds:
+                    if compressed_size <= self.max_file_size_mb and (compressed_duration == 0 or compressed_duration <= self.max_duration_seconds):
                         # Compression worked, use compressed file
                         files_to_transcribe = [temp_compressed]
-                        self.update_status(f"Compressed to {compressed_size:.1f}MB, {compressed_duration/60:.1f}min - uploading to OpenAI...")
-                        logging.info(f"Audio compressed from {file_size_mb:.1f}MB/{duration/60:.1f}min to {compressed_size:.1f}MB/{compressed_duration/60:.1f}min")
+                        self.update_status(f"Compressed to {compressed_size:.1f}MB, uploading to OpenAI...")
+                        logging.info(f"Audio compressed from {file_size_mb:.1f}MB to {compressed_size:.1f}MB")
                     else:
                         # Still exceeds limits, need to split
                         self.update_status("Still exceeds limits, splitting into chunks...")
@@ -819,9 +913,14 @@ class AudioTranscriberApp:
             
             for i, file_path in enumerate(files_to_transcribe):
                 try:
+                    abs_file_path = os.path.abspath(file_path)
                     self.update_status(f"Transcribing chunk {i+1}/{total_files}...")
                     
-                    with open(file_path, "rb") as audio_file:
+                    logging.info(f"Transcribing file: {abs_file_path}")
+                    logging.info(f"File exists: {os.path.exists(abs_file_path)}")
+                    logging.info(f"File size: {os.path.getsize(abs_file_path)} bytes")
+                    
+                    with open(abs_file_path, "rb") as audio_file:
                         transcript = self.client.audio.transcriptions.create(
                             model="gpt-4o-transcribe",
                             file=audio_file
@@ -833,7 +932,7 @@ class AudioTranscriberApp:
                     progress = 0.3 + (0.5 * (i + 1) / total_files)
                     self.update_progress(progress)
                     
-                    logging.info(f"Transcribed chunk {i+1}/{total_files}")
+                    logging.info(f"Transcribed chunk {i+1}/{total_files} successfully")
                     
                 except Exception as e:
                     logging.error(f"Failed to transcribe chunk {i+1}: {e}")
