@@ -25,28 +25,18 @@ jobs:
         $env:PYTHONUTF8 = "1"
         echo "PYTHONUTF8=1" >> $env:GITHUB_ENV
         
-    - name: Download Complete FFmpeg Package
+    - name: Download FFmpeg (Minimal)
       run: |
-        # Download the working essentials build (smaller but has all you need)
-        Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.7z" -OutFile "ffmpeg.7z"
-        
-        # Extract using built-in Windows tools
-        Expand-Archive -Path "ffmpeg.7z" -DestinationPath "ffmpeg-temp" -Force
-        
-        # Create proper folder structure
-        New-Item -ItemType Directory -Force -Path "ffmpeg\bin"
-        
-        # Find the bin directory and copy all files
-        $binDir = Get-ChildItem -Path "ffmpeg-temp" -Recurse -Directory -Name "bin" | Select-Object -First 1
-        $sourcePath = Join-Path "ffmpeg-temp" $binDir
-        Copy-Item -Path "$sourcePath\*" -Destination "ffmpeg\bin\" -Force
-        
-        # Verify files copied
-        $files = Get-ChildItem -Path "ffmpeg\bin\" -Name "*.exe"
-        Write-Host "[SUCCESS] Found executables: $($files -join ', ')"
-        
-        # List all files in bin directory
-        Get-ChildItem -Path "ffmpeg\bin\" | Format-Table Name, Length
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        (New-Object System.Net.WebClient).DownloadFile(
+            "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+            "ffmpeg.zip"
+        )
+        Expand-Archive "ffmpeg.zip" "temp"
+        $bin = Get-ChildItem "temp" -Recurse -Directory -Name "bin"
+        New-Item -Force -Type Directory "ffmpeg\bin"
+        Copy-Item "temp\*\bin\*" "ffmpeg\bin\" -Force
+        Write-Host "FFmpeg ready: $($(Get-ChildItem 'ffmpeg\bin\*.exe').Count) executables"
         
     - name: Install Python dependencies
       run: |
