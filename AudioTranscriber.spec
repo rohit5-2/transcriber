@@ -7,6 +7,7 @@ a = Analysis(
     pathex=[],
     binaries=[
         ('ffmpeg.exe', '.'),
+        ('ffprobe.exe', '.'),
     ],
     datas=[],
     hiddenimports=[

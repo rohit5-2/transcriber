@@ -29,14 +29,23 @@ jobs:
       run: |
         Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile "ffmpeg.zip"
         Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg-temp"
+        
+        # Find and copy both ffmpeg.exe and ffprobe.exe
         $ffmpegPath = Get-ChildItem -Path "ffmpeg-temp" -Filter "ffmpeg.exe" -Recurse | Select-Object -First 1
+        $ffprobePath = Get-ChildItem -Path "ffmpeg-temp" -Filter "ffprobe.exe" -Recurse | Select-Object -First 1
+        
         Copy-Item -Path $ffmpegPath.FullName -Destination "ffmpeg.exe"
-        if (Test-Path "ffmpeg.exe") {
-          Write-Host "[SUCCESS] FFmpeg downloaded successfully"
-          $size = (Get-Item "ffmpeg.exe").Length / 1MB
-          Write-Host "[INFO] FFmpeg size: $([math]::Round($size, 1)) MB"
+        Copy-Item -Path $ffprobePath.FullName -Destination "ffprobe.exe"
+        
+        # Verify both files exist
+        if ((Test-Path "ffmpeg.exe") -and (Test-Path "ffprobe.exe")) {
+          $ffmpegSize = (Get-Item "ffmpeg.exe").Length / 1MB
+          $ffprobeSize = (Get-Item "ffprobe.exe").Length / 1MB
+          Write-Host "[SUCCESS] Both executables downloaded"
+          Write-Host "[INFO] FFmpeg size: $([math]::Round($ffmpegSize, 1)) MB"
+          Write-Host "[INFO] FFprobe size: $([math]::Round($ffprobeSize, 1)) MB"
         } else {
-          Write-Host "[ERROR] FFmpeg download failed"
+          Write-Host "[ERROR] Missing executables"
           exit 1
         }
         

@@ -14,8 +14,6 @@ import logging
 from openai import OpenAI
 from pydub import AudioSegment
 
-# main prod code
-
 # Configure logging for troubleshooting
 logging.basicConfig(
     level=logging.INFO,
@@ -41,12 +39,28 @@ def get_ffmpeg_path():
         # Running as Python script in development
         return os.path.join(os.path.dirname(__file__), 'ffmpeg.exe')
 
-# Set the FFmpeg path globally
+def get_ffprobe_path():
+    """Get the correct ffprobe path for both development and packaged executable"""
+    if getattr(sys, 'frozen', False):
+        # Running as packaged executable
+        if hasattr(sys, '_MEIPASS'):
+            # PyInstaller temp directory
+            return os.path.join(sys._MEIPASS, 'ffprobe.exe')
+        else:
+            # Fallback for other packagers
+            return os.path.join(os.path.dirname(sys.executable), 'ffprobe.exe')
+    else:
+        # Running as Python script in development
+        return os.path.join(os.path.dirname(__file__), 'ffprobe.exe')
+
+# Set the FFmpeg paths globally
 FFMPEG_PATH = get_ffmpeg_path()
+FFPROBE_PATH = get_ffprobe_path()
 
 # Configure pydub to use our bundled ffmpeg
 AudioSegment.converter = FFMPEG_PATH
 AudioSegment.ffmpeg = FFMPEG_PATH
+AudioSegment.ffprobe = FFPROBE_PATH
 
 class AudioTranscriberApp:
     def __init__(self):
@@ -139,11 +153,26 @@ class AudioTranscriberApp:
     def get_audio_duration(self, file_path):
         """Get audio duration in seconds using pydub"""
         try:
+            # Ensure both ffmpeg and ffprobe are set
+            AudioSegment.converter = FFMPEG_PATH
+            AudioSegment.ffmpeg = FFMPEG_PATH  
+            AudioSegment.ffprobe = FFPROBE_PATH
+            
+            # Log paths for debugging
+            logging.info(f"FFmpeg path: {FFMPEG_PATH}")
+            logging.info(f"FFprobe path: {FFPROBE_PATH}")
+            logging.info(f"FFmpeg exists: {os.path.exists(FFMPEG_PATH)}")
+            logging.info(f"FFprobe exists: {os.path.exists(FFPROBE_PATH)}")
+            
             audio = AudioSegment.from_file(file_path)
             duration_seconds = len(audio) / 1000.0  # Convert milliseconds to seconds
             return duration_seconds, None
+            
         except Exception as e:
-            return None, f"Failed to get audio duration: {str(e)}"
+            error_msg = f"Failed to get audio duration: {str(e)}"
+            logging.error(error_msg)
+            # Fallback: Skip duration checking for this file
+            return None, error_msg
     
     def needs_splitting(self, file_path):
         """Check if file needs splitting based on size and duration"""
@@ -322,9 +351,17 @@ class AudioTranscriberApp:
     
     def setup_ui(self):
         try:
-            # Main frame
-            main_frame = ctk.CTkFrame(self.window)
-            main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+            # Configure window grid
+            self.window.grid_rowconfigure(0, weight=1)
+            self.window.grid_columnconfigure(0, weight=1)
+            
+            # Main scrollable frame instead of regular frame
+            main_frame = ctk.CTkScrollableFrame(
+                self.window,
+                corner_radius=0,
+                fg_color="transparent"
+            )
+            main_frame.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
             
             # Title
             title_label = ctk.CTkLabel(
