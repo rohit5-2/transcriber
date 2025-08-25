@@ -5,9 +5,7 @@ block_cipher = None
 a = Analysis(
     ['audio_transcriber.py'],
     pathex=[],
-    binaries=[
-        ('ffmpeg', 'ffmpeg'),  # Include entire ffmpeg folder with all DLLs
-    ],
+    binaries=[],  # No FFmpeg binaries needed
     datas=[],
     hiddenimports=[
         'customtkinter',
@@ -15,6 +13,7 @@ a = Analysis(
         'PIL._tkinter_finder',
         'pydub',
         'pydub.utils',
+        'mutagen',
         'openai'
     ],
     hookspath=[],
@@ -43,7 +42,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=False,  # Set to True if you want to see console output
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
